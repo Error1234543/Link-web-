@@ -3,7 +3,7 @@
 # IMPORTANT: Do NOT store your BOT_TOKEN in the code. Use environment variables.
 #
 # Usage:
-#   export BOT_TOKEN="your_new_token_here"
+#   export BOT_TOKEN="me8202980966:AAGUNnnWEDxQab7wiKiqxu-Ez_p2ESRQbkk"
 #   export CHANNEL_ID="-1003295571464"
 #   (optional) export EXPIRE_SECONDS="20"
 #   python bot.py
