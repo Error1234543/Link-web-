@@ -20,7 +20,7 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("8202980966:AAGUNnnWEDxQab7wiKiqxu-Ez_p2ESRQbkk")
 CHANNEL_ID = os.getenv("CHANNEL_ID", "-1003295571464")  # provided channel id
 EXPIRE_SECONDS = int(os.getenv("EXPIRE_SECONDS", "20"))
 MEMBER_LIMIT = int(os.getenv("MEMBER_LIMIT", "1"))
