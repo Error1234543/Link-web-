@@ -1,5 +1,5 @@
 # bot.py
-# Secure Invite Bot (auto-expiring invite links)
+# Secure Invite Bot with multiple channel support
 
 import os
 import time
@@ -9,27 +9,31 @@ import telebot
 import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# --- Logging setup ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-# --- Environment Variables ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID", "-1003295571464")
-EXPIRE_SECONDS = int(os.getenv("EXPIRE_SECONDS", "20"))
+EXPIRE_SECONDS = int(os.getenv("EXPIRE_SECONDS", "30"))  # 30 sec default
 MEMBER_LIMIT = int(os.getenv("MEMBER_LIMIT", "1"))
 
 if not BOT_TOKEN:
-    raise SystemExit("Error: BOT_TOKEN environment variable not set. Set it before running the bot.")
+    raise SystemExit("Error: BOT_TOKEN environment variable not set.")
 
-# --- Telegram Setup ---
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-# --- Create Invite ---
-def create_invite_link():
+# ------------------ CHANNEL MAP -------------------
+# command_name : channel_id
+CHANNEL_MAP = {
+    "xd": "-1001111111111",       # replace with your /XD channel ID
+    "alun": "-1003032615437",     # replace with your /ALUN channel ID
+    "vip": "-1003333333333",      # replace with your /VIP channel ID
+}
+# --------------------------------------------------
+
+def create_invite_link(channel_id):
     expire_date = int(time.time()) + EXPIRE_SECONDS
     payload = {
-        "chat_id": CHANNEL_ID,
+        "chat_id": channel_id,
         "expire_date": expire_date,
         "member_limit": MEMBER_LIMIT
     }
@@ -40,51 +44,52 @@ def create_invite_link():
         raise Exception("Failed to create invite link")
     return j["result"]["invite_link"]
 
-# --- Revoke Invite ---
-def revoke_link(link):
-    payload = {"chat_id": CHANNEL_ID, "invite_link": link}
+def revoke_link(channel_id, link):
+    payload = {"chat_id": channel_id, "invite_link": link}
     try:
         requests.post(f"{TG_API}/revokeChatInviteLink", json=payload, timeout=10)
     except Exception as e:
         logging.exception("Failed to revoke link: %s", e)
 
-# --- Command: /start ---
-@bot.message_handler(commands=['start'])
-def start(message):
+# ---------------- COMMAND HANDLER -----------------
+@bot.message_handler(commands=list(CHANNEL_MAP.keys()))
+def handle_multi_channel(message):
+    cmd = message.text.strip().lstrip("/").lower()
     chat_id = message.chat.id
-    try:
-        link = create_invite_link()
-    except Exception as e:
-        logging.exception("Error creating invite link")
-        bot.send_message(chat_id, "⚠️ Sorry, couldn't create an invite right now. Try again later.")
+    channel_id = CHANNEL_MAP.get(cmd)
+
+    if not channel_id:
+        bot.reply_to(message, "⚠️ Unknown command or channel not configured.")
         return
 
-    bot.send_message(chat_id, f"🔐 Here is your private channel link (valid for ~{EXPIRE_SECONDS} seconds):\n\n{link}\n\n⏳ It will expire soon.")
+    try:
+        link = create_invite_link(channel_id)
+    except Exception as e:
+        logging.exception("Error creating invite link")
+        bot.send_message(chat_id, "⚠️ Sorry, couldn't create an invite link right now.")
+        return
 
-    def revoke_and_notify(inv):
+    bot.send_message(chat_id, f"🔗 <b>Private invite link</b> for <code>/{cmd}</code>:\n\n{link}\n\n⏳ Valid for {EXPIRE_SECONDS} seconds.")
+
+    def revoke_later():
         time.sleep(EXPIRE_SECONDS)
-        revoke_link(inv)
+        revoke_link(channel_id, link)
         try:
-            bot.send_message(chat_id, "⏳ The invite has expired. Send /start again to get a new one.")
+            bot.send_message(chat_id, f"⏳ The /{cmd} invite link has expired.")
         except Exception:
             pass
 
-    threading.Thread(target=lambda: revoke_and_notify(link), daemon=True).start()
+    threading.Thread(target=revoke_later, daemon=True).start()
 
-# --- Command: /status ---
-@bot.message_handler(commands=['status'])
-def status_cmd(message):
-    admin_id = os.getenv('ADMIN_ID')
-    if admin_id and str(message.chat.id) != str(admin_id):
-        bot.reply_to(message, "This command is restricted.")
-        return
-    try:
-        r = requests.get(f"{TG_API}/getMe", timeout=10).json()
-        bot.reply_to(message, f"Bot status: {r.get('ok')}, bot info: {r.get('result')}")
-    except Exception as e:
-        bot.reply_to(message, f"Error checking bot: {e}")
+# --------------------------------------------------
+@bot.message_handler(commands=['start'])
+def start_cmd(message):
+    bot.send_message(message.chat.id,
+        "👋 Welcome! Use commands below to get channel invite links:\n\n" +
+        "\n".join([f"/{k}" for k in CHANNEL_MAP.keys()])
+    )
 
-# --- Fake Web Server for Koyeb Health Check ---
+# --- Health Check for Koyeb ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -95,8 +100,8 @@ def run_server():
     server = HTTPServer(("0.0.0.0", int(os.getenv("PORT", "8080"))), HealthCheckHandler)
     server.serve_forever()
 
-# --- Start everything ---
+# --- Start ---
 if __name__ == '__main__':
     threading.Thread(target=run_server, daemon=True).start()
-    logging.info("Starting bot (long polling)...")
+    logging.info("✅ Bot started with multiple-channel support.")
     bot.infinity_polling(timeout=60, long_polling_timeout=60)
