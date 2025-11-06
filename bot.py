@@ -24,7 +24,7 @@ TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 # ------------------ CHANNEL MAP -------------------
 # command_name : channel_id
 CHANNEL_MAP = {
-    "xd": "-1001111111111",       # replace with your /XD channel ID
+    "xd": "-1002511599219",       # replace with your /XD channel ID
     "alun": "-1003032615437",     # replace with your /ALUN channel ID
     "vip": "-1003333333333",      # replace with your /VIP channel ID
 }
